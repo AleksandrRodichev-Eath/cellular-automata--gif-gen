@@ -1,17 +1,33 @@
-# Simulation Generator Usage
+# Simulation Web Service
 
-Run the CLI directly with `cargo run` so changes compile and execute in one step:
+The simulator now runs as a web service. Start it with:
 
 ```sh
-cargo run -- --steps 50 --rule B3/S23 --output target/sample.gif
+export TELEGRAM_BOT_TOKEN=your_bot_token
+export TELEGRAM_CHAT_ID=@your_channel_or_chat_id
+# Optional: APP_BIND_ADDR or PORT to change 0.0.0.0:3000
+cargo run
 ```
 
-- `--steps` sets the maximum generations to simulate.  
-- `--rule` chooses the life-like rule in `B#/S#` format.  
-- `--output` points to the desired GIF path; the program appends `_<steps>s` to the filename using the actual number of steps simulated.
+Send simulations via HTTP:
 
-Typical workflow:
+```sh
+curl -X POST http://localhost:3000/generate \
+  -H 'content-type: application/json' \
+  -d '{
+        "rule": "B3/S23",
+        "steps": 50,
+        "density": 0.08,
+        "width": 200,
+        "height": 200,
+        "scale": 3,
+        "caption": "Game of Life demo"
+      }'
+```
 
-1. Adjust flags (e.g., `--density 0.02`, `--init-mask 001010111`, `--no-wrap`) to match the scenario you want.
-2. Inspect the generated GIF, now named with the step count (e.g., `sample_37s.gif`).
-3. Re-run with different settings as needed, or use `cargo test` to validate the suite.
+- `rule` uses the standard `B#/S#` syntax.
+- Provide `density` and `init_mask` (3×3 binary string) to seed repeatable shapes; add `seed_cells` for explicit coordinates.
+- GIFs are generated in-memory, sent to the configured Telegram channel, and the JSON response includes the derived filename plus simulation stats.
+- On startup—and every day at 10:00 and 18:00 Asia/Tbilisi—the service automatically simulates rule `B3_S12345` and posts the resulting GIF plus a caption detailing the simulation parameters to the configured channel.
+
+Run `cargo test` to exercise the simulator logic and the HTTP endpoint with a stubbed Telegram server.
