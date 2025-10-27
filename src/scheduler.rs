@@ -74,12 +74,17 @@ async fn send_scheduled_gif(state: &AppState) -> Result<()> {
         .context("failed to parse schedule rule")?;
 
     let result = generator::run_simulation(options)?;
+    let saved_path = generator::persist_last_gif(&result.gif_bytes)?;
 
     state
         .telegram
-        .send_document(&result.file_name, &result.gif_bytes, &result.summary)
+        .send_animation(&result.file_name, &result.gif_bytes, &result.summary)
         .await?;
-    tracing::info!("Dispatched scheduled GIF: {}", result.summary);
+    tracing::info!(
+        "Dispatched scheduled GIF: {} (saved at {})",
+        result.summary,
+        saved_path.display()
+    );
     Ok(())
 }
 

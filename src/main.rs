@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::time::Duration;
 
 use anyhow::Result;
 use tokio::net::TcpListener;
@@ -18,15 +17,11 @@ async fn main() -> Result<()> {
     let bind_address = config.bind_address;
     tracing::info!("Starting server on {}", bind_address);
 
-    let http_client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()?;
-
     let telegram = TelegramSender::new(
-        http_client,
         config.telegram_bot_token.clone(),
         config.telegram_chat_id.clone(),
-    );
+    )
+    .await?;
 
     let state = AppState {
         config: Arc::clone(&config),

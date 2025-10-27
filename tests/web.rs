@@ -1,7 +1,9 @@
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::body::{self, Body};
-use axum::http::Request;
+use axum::http::{Request, StatusCode};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
@@ -19,20 +21,22 @@ async fn generate_endpoint_succeeds_with_stubbed_telegram() {
         .expect("stub telegram bind");
     let telegram_addr = telegram_listener.local_addr().unwrap();
     tokio::spawn(async move {
-        let app = Router::new().route("/botTESTTOKEN/sendDocument", post(telegram_stub));
+        let app = Router::new()
+            .route(
+                "/botTESTTOKEN/sendAnimation",
+                post(telegram_send_animation_stub),
+            )
+            .route("/botTESTTOKEN/getMe", post(telegram_get_me_stub));
         axum::serve(telegram_listener, app)
             .await
             .expect("serve telegram stub");
     });
 
     let base_url = format!("http://{}", telegram_addr);
-    let http_client = reqwest::Client::new();
-    let telegram_sender = TelegramSender::with_base_url(
-        http_client,
-        base_url,
-        "TESTTOKEN".to_owned(),
-        "@channel".to_owned(),
-    );
+    let telegram_sender =
+        TelegramSender::with_base_url(base_url, "TESTTOKEN".to_owned(), "@channel".to_owned())
+            .await
+            .expect("telegram sender");
 
     let config = Arc::new(AppConfig {
         telegram_bot_token: "TESTTOKEN".to_owned(),
@@ -46,6 +50,8 @@ async fn generate_endpoint_succeeds_with_stubbed_telegram() {
     };
 
     let app = web::router(state);
+    let last_path = PathBuf::from("gif/last.gif");
+    let previous = fs::read(&last_path).ok();
 
     let request_body = serde_json::json!({
         "steps": 2,
@@ -63,7 +69,7 @@ async fn generate_endpoint_succeeds_with_stubbed_telegram() {
         .body(Body::from(request_body.to_string()))
         .unwrap();
 
-    let response = app.oneshot(request).await.unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
     assert!(response.status().is_success());
     let bytes = body::to_bytes(response.into_body(), 1_000_000)
         .await
@@ -77,15 +83,59 @@ async fn generate_endpoint_succeeds_with_stubbed_telegram() {
     assert!(message.contains("stubbed"));
     assert!(message.contains(summary));
     assert!(payload["file_name"].as_str().unwrap().ends_with(".gif"));
+    assert!(
+        payload["last_gif_path"]
+            .as_str()
+            .unwrap()
+            .ends_with("gif/last.gif")
+    );
+    assert!(last_path.exists());
+
+    let get_request = Request::builder()
+        .method("GET")
+        .uri("/last.gif")
+        .body(Body::empty())
+        .unwrap();
+    let gif_response = app.oneshot(get_request).await.unwrap();
+    assert_eq!(gif_response.status(), StatusCode::OK);
+
+    if let Some(bytes) = previous {
+        fs::create_dir_all(last_path.parent().unwrap()).unwrap();
+        fs::write(&last_path, bytes).unwrap();
+    } else {
+        let _ = fs::remove_file(&last_path);
+    }
 }
 
-async fn telegram_stub(req: Request<Body>) -> impl IntoResponse {
+async fn telegram_send_animation_stub(req: Request<Body>) -> impl IntoResponse {
     let (parts, body) = req.into_parts();
-    assert_eq!(parts.uri.path(), "/botTESTTOKEN/sendDocument");
+    assert_eq!(parts.uri.path(), "/botTESTTOKEN/sendAnimation");
     let bytes = body::to_bytes(body, 1_000_000).await.unwrap();
     let body_text = String::from_utf8_lossy(&bytes);
     assert!(body_text.contains("caption"));
     assert!(body_text.contains("Simulated 2 generations"));
     assert!(body_text.contains("stubbed"));
-    Json(json!({ "ok": true }))
+    Json(json!({
+        "ok": true,
+        "result": {
+            "message_id": 1,
+            "date": 0,
+            "chat": {
+                "id": 1,
+                "type": "channel",
+                "title": "stub"
+            }
+        }
+    }))
+}
+
+async fn telegram_get_me_stub(_req: Request<Body>) -> impl IntoResponse {
+    Json(json!({
+        "ok": true,
+        "result": {
+            "id": 1,
+            "is_bot": true,
+            "first_name": "Stub Bot"
+        }
+    }))
 }

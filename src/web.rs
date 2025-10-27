@@ -1,14 +1,17 @@
+use std::io::ErrorKind;
 use std::sync::Arc;
 
 use axum::{
     Json, Router,
+    body::Body,
     extract::State,
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::post,
+    routing::{get, post},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tokio::fs;
 
 use crate::config::AppConfig;
 use crate::generator::{self, SimulationDimensions, SimulationOptions};
@@ -25,6 +28,7 @@ pub struct AppState {
 pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/generate", post(generate_handler))
+        .route("/last.gif", get(serve_last_gif))
         .with_state(state)
 }
 
@@ -81,6 +85,7 @@ pub struct GenerateResponse {
     pub random_seed: u64,
     pub summary: String,
     pub message: String,
+    pub last_gif_path: String,
 }
 
 #[derive(Debug)]
@@ -163,6 +168,9 @@ async fn generate_handler(
     let result = generator::run_simulation(options)
         .map_err(|err| ApiError::bad_request(format!("simulation failed: {err}")))?;
 
+    let last_gif_path = generator::persist_last_gif(&result.gif_bytes)
+        .map_err(|err| ApiError::internal(format!("failed to store GIF: {err}")))?;
+
     let mut message = result.summary.clone();
     if let Some(extra) = request
         .caption
@@ -176,7 +184,7 @@ async fn generate_handler(
 
     state
         .telegram
-        .send_document(&result.file_name, &result.gif_bytes, &message)
+        .send_animation(&result.file_name, &result.gif_bytes, &message)
         .await
         .map_err(|err| ApiError::internal(format!("failed to send GIF: {err}")))?;
 
@@ -198,6 +206,21 @@ async fn generate_handler(
         random_seed: result.random_seed,
         summary: result.summary,
         message,
+        last_gif_path: last_gif_path.to_string_lossy().to_string(),
     };
     Ok(Json(response))
+}
+
+async fn serve_last_gif() -> Result<Response<Body>, ApiError> {
+    match fs::read("gif/last.gif").await {
+        Ok(bytes) => Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "image/gif")
+            .body(Body::from(bytes))
+            .map_err(|err| ApiError::internal(format!("failed to build response: {err}"))),
+        Err(err) if err.kind() == ErrorKind::NotFound => {
+            Err(ApiError::new(StatusCode::NOT_FOUND, "no GIF generated yet"))
+        }
+        Err(err) => Err(ApiError::internal(format!("failed to read GIF: {err}"))),
+    }
 }

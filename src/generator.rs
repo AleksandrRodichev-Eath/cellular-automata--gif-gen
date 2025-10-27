@@ -1,4 +1,6 @@
+use std::fs;
 use std::io::Cursor;
+use std::path::PathBuf;
 
 use anyhow::{Context, Result, ensure};
 
@@ -9,7 +11,7 @@ use crate::seed;
 
 pub const DEFAULT_WORLD_WIDTH: usize = 200;
 pub const DEFAULT_WORLD_HEIGHT: usize = 200;
-pub const DEFAULT_SCALE: usize = 3;
+pub const DEFAULT_SCALE: usize = 6;
 pub const DEFAULT_STEPS: u32 = 100;
 pub const DEFAULT_DELAY_CS: u16 = 6;
 
@@ -319,6 +321,14 @@ fn append_step_suffix(name: &str, steps: u32) -> String {
         Some((base, ext)) if !ext.is_empty() => format!("{base}{suffix}.{ext}"),
         _ => format!("{name}{suffix}"),
     }
+}
+
+pub fn persist_last_gif(bytes: &[u8]) -> Result<PathBuf> {
+    let dir = PathBuf::from("gif");
+    fs::create_dir_all(&dir).context("failed to create gif directory")?;
+    let path = dir.join("last.gif");
+    fs::write(&path, bytes).context("failed to write last GIF")?;
+    Ok(path)
 }
 
 #[cfg(test)]

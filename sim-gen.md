@@ -29,5 +29,6 @@ curl -X POST http://localhost:3000/generate \
 - Provide `density` and `init_mask` (3×3 binary string) to seed repeatable shapes; add `seed_cells` for explicit coordinates.
 - GIFs are generated in-memory, sent to the configured Telegram channel, and the JSON response includes the derived filename plus simulation stats.
 - On startup—and every day at 10:00 and 18:00 Asia/Tbilisi—the service automatically simulates rule `B3_S12345` and posts the resulting GIF plus a caption detailing the simulation parameters to the configured channel.
+- The most recent GIF is persisted at `gif/last.gif`; download it directly via `GET /last.gif` to compare against what Telegram delivered.
 
 Run `cargo test` to exercise the simulator logic and the HTTP endpoint with a stubbed Telegram server.
