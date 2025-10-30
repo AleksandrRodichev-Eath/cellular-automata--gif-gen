@@ -18,6 +18,16 @@ public class SimulationService {
     private static final String GIF_DIRECTORY = "gif";
     private static final String LAST_GIF_NAME = "last.gif";
 
+    public static void main(String[] args) {
+        SimulationOptions options = SimulationOptions.builder()
+            .rule(Rule.parse("B3/S345"))
+            .ruleLabel("B3/S12345")
+            .build();
+        SimulationService simulationService = new SimulationService();
+        SimulationResult result = simulationService.runSimulation(options);
+        simulationService.persistLastGif(result.gifBytes());
+    }
+
     public SimulationResult runSimulation(SimulationOptions options) {
         Objects.requireNonNull(options, "options");
         SimulationDimensions dimensions = options.dimensions();
@@ -144,6 +154,7 @@ public class SimulationService {
                 current = next;
             }
 
+            writer.close();
             return new SimulationRun(buffer.toByteArray(), current, stepsSimulated == 0 ? options.steps() : stepsSimulated);
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to render simulation", ex);

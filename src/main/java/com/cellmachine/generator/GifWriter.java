@@ -16,8 +16,7 @@ import javax.imageio.metadata.IIOMetadataNode;
 import javax.imageio.stream.ImageOutputStream;
 
 public final class GifWriter implements Closeable {
-
-    private static final byte[] BLACK_WHITE = new byte[]{0x00, (byte) 0xFF};
+    private static final Palette2D PALETTE = Palette2D.ysConcreteJungle;
 
     private final int width;
     private final int height;
@@ -47,7 +46,7 @@ public final class GifWriter implements Closeable {
         this.outputStream = ImageIO.createImageOutputStream(output);
         this.writer.setOutput(outputStream);
         this.writer.prepareWriteSequence(null);
-        this.colorModel = new IndexColorModel(1, 2, BLACK_WHITE, BLACK_WHITE, BLACK_WHITE);
+        this.colorModel = buildColorModel(PALETTE.deadColor, PALETTE.aliveColor);
     }
 
     public void writeFrame(Grid grid) throws IOException {
@@ -114,6 +113,7 @@ public final class GifWriter implements Closeable {
             appExtensions.appendChild(appExtension);
         }
 
+        applyLocalColorTable(root, image);
         metadata.setFromTree(formatName, root);
         return metadata;
     }
@@ -137,5 +137,56 @@ public final class GifWriter implements Closeable {
         closed = true;
         writer.endWriteSequence();
         outputStream.close();
+    }
+
+    private void applyLocalColorTable(IIOMetadataNode root, BufferedImage image) {
+        if (!(image.getColorModel() instanceof IndexColorModel indexModel)) {
+            throw new IllegalStateException("Expected indexed color model for GIF rendering");
+        }
+        IIOMetadataNode localColorTable = getNode(root, "LocalColorTable");
+        clearChildren(localColorTable);
+        int size = indexModel.getMapSize();
+        localColorTable.setAttribute("sizeOfLocalColorTable", Integer.toString(size));
+        localColorTable.setAttribute("sortFlag", "FALSE");
+        for (int i = 0; i < size; i++) {
+            IIOMetadataNode entry = new IIOMetadataNode("ColorTableEntry");
+            entry.setAttribute("index", Integer.toString(i));
+            entry.setAttribute("red", Integer.toString(indexModel.getRed(i)));
+            entry.setAttribute("green", Integer.toString(indexModel.getGreen(i)));
+            entry.setAttribute("blue", Integer.toString(indexModel.getBlue(i)));
+            localColorTable.appendChild(entry);
+        }
+    }
+
+    private void clearChildren(IIOMetadataNode node) {
+        while (node.hasChildNodes()) {
+            node.removeChild(node.getFirstChild());
+        }
+    }
+
+    private IndexColorModel buildColorModel(String deadHex, String aliveHex) {
+        int deadRgb = parseHexColor(deadHex);
+        int aliveRgb = parseHexColor(aliveHex);
+        byte[] reds = new byte[]{
+            (byte) ((deadRgb >> 16) & 0xFF),
+            (byte) ((aliveRgb >> 16) & 0xFF)
+        };
+        byte[] greens = new byte[]{
+            (byte) ((deadRgb >> 8) & 0xFF),
+            (byte) ((aliveRgb >> 8) & 0xFF)
+        };
+        byte[] blues = new byte[]{
+            (byte) (deadRgb & 0xFF),
+            (byte) (aliveRgb & 0xFF)
+        };
+        return new IndexColorModel(1, 2, reds, greens, blues);
+    }
+
+    private int parseHexColor(String hex) {
+        String normalized = hex.startsWith("#") ? hex.substring(1) : hex;
+        if (normalized.length() != 6) {
+            throw new IllegalArgumentException("Expected RGB hex color in format RRGGBB: " + hex);
+        }
+        return Integer.parseInt(normalized, 16);
     }
 }
