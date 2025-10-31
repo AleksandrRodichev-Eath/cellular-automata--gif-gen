@@ -5,6 +5,7 @@ import java.awt.image.IndexColorModel;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Objects;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -16,8 +17,6 @@ import javax.imageio.metadata.IIOMetadataNode;
 import javax.imageio.stream.ImageOutputStream;
 
 public final class GifWriter implements Closeable {
-    private static final Palette2D PALETTE = Palette2D.ysConcreteJungle;
-
     private final int width;
     private final int height;
     private final int scale;
@@ -29,10 +28,11 @@ public final class GifWriter implements Closeable {
     private boolean firstFrame = true;
     private boolean closed;
 
-    public GifWriter(OutputStream output, int width, int height, int scale, int delayCs) throws IOException {
+    public GifWriter(OutputStream output, int width, int height, int scale, int delayCs, Palette2D palette) throws IOException {
         if (scale <= 0) {
             throw new IllegalArgumentException("Scale must be greater than zero");
         }
+        Objects.requireNonNull(palette, "palette");
         this.width = width;
         this.height = height;
         this.scale = scale;
@@ -46,7 +46,7 @@ public final class GifWriter implements Closeable {
         this.outputStream = ImageIO.createImageOutputStream(output);
         this.writer.setOutput(outputStream);
         this.writer.prepareWriteSequence(null);
-        this.colorModel = buildColorModel(PALETTE.deadColor, PALETTE.aliveColor);
+        this.colorModel = buildColorModel(palette.deadColor, palette.aliveColor);
     }
 
     public void writeFrame(Grid grid) throws IOException {

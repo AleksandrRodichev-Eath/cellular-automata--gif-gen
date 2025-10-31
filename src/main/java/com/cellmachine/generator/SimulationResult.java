@@ -4,6 +4,7 @@ public record SimulationResult(
         byte[] bytes,
         String fileName,
         SimulationOutputFormat format,
+        Palette2D palette,
         int stepsRequested,
         int stepsSimulated,
         int finalAlive,

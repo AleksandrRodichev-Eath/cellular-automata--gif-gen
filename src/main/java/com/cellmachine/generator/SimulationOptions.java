@@ -20,6 +20,7 @@ public final class SimulationOptions {
     private final SimulationDimensions dimensions;
     private final long randomSeed;
     private final SimulationOutputFormat outputFormat;
+    private final Palette2D palette;
 
     private SimulationOptions(Builder builder) {
         this.steps = builder.steps;
@@ -33,6 +34,7 @@ public final class SimulationOptions {
         this.dimensions = builder.dimensions;
         this.randomSeed = builder.randomSeed;
         this.outputFormat = builder.outputFormat;
+        this.palette = builder.palette;
     }
 
     public int steps() {
@@ -79,6 +81,10 @@ public final class SimulationOptions {
         return outputFormat;
     }
 
+    public Palette2D palette() {
+        return palette;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -95,6 +101,7 @@ public final class SimulationOptions {
         private SimulationDimensions dimensions = SimulationDimensions.defaults();
         private long randomSeed = SeedService.DEFAULT_RANDOM_SEED;
         private SimulationOutputFormat outputFormat = SimulationOutputFormat.GIF;
+        private Palette2D palette = Palette2D.ysConcreteJungle;
 
         public Builder steps(int steps) {
             if (steps <= 0) {
@@ -165,6 +172,11 @@ public final class SimulationOptions {
             return this;
         }
 
+        public Builder palette(Palette2D palette) {
+            this.palette = Objects.requireNonNull(palette, "palette");
+            return this;
+        }
+
         public SimulationOptions build() {
             if (rule == null) {
                 throw new IllegalStateException("Rule must be provided");
@@ -174,6 +186,9 @@ public final class SimulationOptions {
             }
             if (outputFormat == null) {
                 throw new IllegalStateException("Output format must be provided");
+            }
+            if (palette == null) {
+                throw new IllegalStateException("Palette must be provided");
             }
             return new SimulationOptions(this);
         }

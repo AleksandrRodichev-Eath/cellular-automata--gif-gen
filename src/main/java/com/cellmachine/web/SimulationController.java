@@ -103,6 +103,7 @@ public class SimulationController {
                 result.fileName(),
                 result.format().name(),
                 result.mediaType(),
+                result.palette().name(),
                 result.stepsRequested(),
                 result.stepsSimulated(),
                 result.finalAlive(),

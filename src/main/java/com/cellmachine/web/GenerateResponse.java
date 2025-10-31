@@ -4,6 +4,7 @@ public record GenerateResponse(
         String fileName,
         String format,
         String mediaType,
+        String palette,
         int stepsRequested,
         int stepsSimulated,
         int finalAlive,

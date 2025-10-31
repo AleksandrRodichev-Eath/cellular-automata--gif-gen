@@ -23,6 +23,7 @@ class SimulationServiceTest {
         assertEquals(5, result.stepsRequested());
         assertEquals("B3/S23", result.ruleLabel());
         assertNotNull(result.summary());
+        assertEquals(Palette2D.ysConcreteJungle, result.palette());
     }
 
     @Test
@@ -32,11 +33,13 @@ class SimulationServiceTest {
                 .steps(3)
                 .delayCs(5)
                 .wrap(false)
+                .palette(Palette2D.bitbee)
                 .outputFormat(SimulationOutputFormat.MP4)
                 .build();
 
         SimulationResult result = service.runSimulation(options);
         assertEquals(SimulationOutputFormat.MP4, result.format());
+        assertEquals(Palette2D.bitbee, result.palette());
         assertTrue(result.bytes().length > 0);
         assertTrue(result.fileName().endsWith(".mp4"));
         assertEquals(3, result.stepsRequested());

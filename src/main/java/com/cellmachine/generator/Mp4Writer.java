@@ -7,6 +7,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 
 import org.jcodec.api.awt.AWTSequenceEncoder;
 
@@ -14,9 +15,6 @@ import org.jcodec.api.awt.AWTSequenceEncoder;
  * Writes an MP4 animation (H.264 baseline) from simulation frames.
  */
 public final class Mp4Writer implements Closeable {
-
-    private static final Palette2D PALETTE = Palette2D.ysConcreteJungle;
-
     private final int width;
     private final int height;
     private final int scale;
@@ -27,13 +25,14 @@ public final class Mp4Writer implements Closeable {
     private boolean closed;
     private boolean consumed;
 
-    public Mp4Writer(int width, int height, int scale, int delayCs) throws IOException {
+    public Mp4Writer(int width, int height, int scale, int delayCs, Palette2D palette) throws IOException {
         if (scale <= 0) {
             throw new IllegalArgumentException("Scale must be greater than zero");
         }
         if (delayCs <= 0) {
             throw new IllegalArgumentException("Delay must be positive");
         }
+        Objects.requireNonNull(palette, "palette");
         this.width = width;
         this.height = height;
         this.scale = scale;
@@ -41,8 +40,8 @@ public final class Mp4Writer implements Closeable {
         double fpsValue = 100.0 / delayCs;
         int fps = (int) Math.max(1, Math.round(fpsValue));
         this.encoder = AWTSequenceEncoder.createSequenceEncoder(tempFile.toFile(), fps);
-        this.deadColor = decodeColor(PALETTE.deadColor);
-        this.aliveColor = decodeColor(PALETTE.aliveColor);
+        this.deadColor = decodeColor(palette.deadColor);
+        this.aliveColor = decodeColor(palette.aliveColor);
     }
 
     public void writeFrame(Grid grid) throws IOException {

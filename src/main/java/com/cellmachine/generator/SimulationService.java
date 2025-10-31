@@ -38,12 +38,13 @@ public class SimulationService {
         List<CellCoordinate> seedCells = options.seedCells();
         Double density = options.density();
         SimulationOutputFormat format = options.outputFormat();
+        Palette2D palette = options.palette();
 
         String initMaskLabel = mask == null ? null : SeedService.maskToLabel(mask);
         Integer seedCellCount = seedCells.isEmpty() ? null : seedCells.size();
 
         Grid initialGrid = buildInitialGrid(dimensions, mask, density, seedCells, options.randomSeed());
-        SimulationRun run = renderSimulation(options, initialGrid);
+        SimulationRun run = renderSimulation(options, initialGrid, palette);
 
         Double effectiveDensity = determineEffectiveDensity(mask, density, seedCells);
         Grid finalGrid = run.finalGrid();
@@ -71,6 +72,7 @@ public class SimulationService {
                 run.bytes(),
                 fileName,
                 format,
+                palette,
                 options.steps(),
                 run.stepsSimulated(),
                 finalAlive,
@@ -147,36 +149,38 @@ public class SimulationService {
         return SeedService.randomGrid(width, height, effectiveDensity, randomSeed);
     }
 
-    private SimulationRun renderSimulation(SimulationOptions options, Grid initialGrid) {
+    private SimulationRun renderSimulation(SimulationOptions options, Grid initialGrid, Palette2D palette) {
         try {
             return switch (options.outputFormat()) {
-                case GIF -> renderGif(options, initialGrid);
-                case MP4 -> renderMp4(options, initialGrid);
+                case GIF -> renderGif(options, initialGrid, palette);
+                case MP4 -> renderMp4(options, initialGrid, palette);
             };
         } catch (IOException ex) {
             throw new IllegalStateException("Failed to render simulation", ex);
         }
     }
 
-    private SimulationRun renderGif(SimulationOptions options, Grid initialGrid) throws IOException {
+    private SimulationRun renderGif(SimulationOptions options, Grid initialGrid, Palette2D palette) throws IOException {
         try (ByteArrayOutputStream buffer = new ByteArrayOutputStream();
              GifWriter writer = new GifWriter(buffer,
                      options.dimensions().width(),
                      options.dimensions().height(),
                      options.dimensions().scale(),
-                     options.delayCs())) {
+                     options.delayCs(),
+                     palette)) {
             SimulationLoopResult loop = writeFrames(initialGrid, options, writer::writeFrame);
             writer.close();
             return new SimulationRun(buffer.toByteArray(), loop.finalGrid(), loop.stepsSimulated());
         }
     }
 
-    private SimulationRun renderMp4(SimulationOptions options, Grid initialGrid) throws IOException {
+    private SimulationRun renderMp4(SimulationOptions options, Grid initialGrid, Palette2D palette) throws IOException {
         try (Mp4Writer writer = new Mp4Writer(
                 options.dimensions().width(),
                 options.dimensions().height(),
                 options.dimensions().scale(),
-                options.delayCs())) {
+                options.delayCs(),
+                palette)) {
             SimulationLoopResult loop = writeFrames(initialGrid, options, writer::writeFrame);
             writer.close();
             return new SimulationRun(writer.toByteArray(), loop.finalGrid(), loop.stepsSimulated());
