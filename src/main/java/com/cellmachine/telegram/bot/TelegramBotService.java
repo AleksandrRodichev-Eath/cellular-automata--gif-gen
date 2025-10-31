@@ -125,7 +125,6 @@ public class TelegramBotService {
                 default -> telegramService.answerCallback(callback.id(), "Сейчас ожидается текстовый ввод.");
             }
         } finally {
-            // Confirm the callback to remove loading spinner in Telegram client.
             telegramService.answerCallback(callback.id(), null);
         }
     }

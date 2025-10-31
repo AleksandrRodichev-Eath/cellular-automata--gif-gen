@@ -4,6 +4,7 @@ import com.cellmachine.config.AppProperties;
 import com.cellmachine.telegram.dto.InlineKeyboardMarkupDto;
 import com.cellmachine.telegram.dto.TelegramApiResponse;
 import com.cellmachine.telegram.dto.TelegramMessageDto;
+import com.cellmachine.telegram.dto.TelegramUpdateDto;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.core.ParameterizedTypeReference;
@@ -26,6 +27,9 @@ public class TelegramService {
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<TelegramApiResponse<Boolean>> BOOLEAN_RESPONSE_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
+    private static final ParameterizedTypeReference<TelegramApiResponse<TelegramUpdateDto[]>> UPDATES_RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
@@ -74,6 +78,15 @@ public class TelegramService {
         postForResult("answerCallbackQuery", payload, BOOLEAN_RESPONSE_TYPE);
     }
 
+    public TelegramUpdateDto[] getUpdates(Long offset, int timeoutSeconds) {
+        Map<String, Object> payload = new HashMap<>();
+        if (offset != null) {
+            payload.put("offset", offset);
+        }
+        payload.put("timeout", timeoutSeconds);
+        return postForResult("getUpdates", payload, UPDATES_RESPONSE_TYPE);
+    }
+
     public void sendAnimation(String fileName, byte[] bytes, String caption) {
         sendAnimationInternal(properties.getTelegramChatId(), fileName, bytes, caption);
     }
@@ -89,7 +102,7 @@ public class TelegramService {
         if (caption != null && !caption.isBlank()) {
             body.add("caption", caption);
         }
-        body.add("animation", new NamedByteArrayResource(fileName, bytes));
+        body.add("animation", new NamedByteArrayResource(ensureFileName(fileName), bytes));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
@@ -105,12 +118,15 @@ public class TelegramService {
         }
     }
 
-    public String buildWebhookUrl() {
-        return buildApiUrl("setWebhook");
+    private String ensureFileName(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return "simulation.mp4";
+        }
+        return fileName;
     }
 
     private String buildApiUrl(String method) {
-        String baseUrl = properties.getTelegramBaseUrl().orElse("https://api.telegram.org").replaceAll("/+$", "");
+        String baseUrl = properties.getTelegramBaseUrl().orElse("https://api.telegram.org").replaceAll("/+$$", "");
         if (!baseUrl.endsWith("/bot")) {
             baseUrl = baseUrl + "/bot";
         }
