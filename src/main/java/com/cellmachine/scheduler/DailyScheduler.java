@@ -44,11 +44,11 @@ public class DailyScheduler {
                     .ruleLabel(SCHEDULE_RULE_CODE)
                     .build();
             SimulationResult result = simulationService.runSimulation(options);
-            Path savedPath = simulationService.persistLastGif(result.gifBytes());
-            telegramService.sendAnimation(result.fileName(), result.gifBytes(), result.summary());
-            log.info("Dispatched {} GIF: {} (saved at {})", label, result.summary(), savedPath);
+            Path savedPath = simulationService.persistLastMedia(result.bytes(), result.format());
+            telegramService.sendAnimation(result.fileName(), result.bytes(), result.summary());
+            log.info("Dispatched {} {}: {} (saved at {})", label, result.format(), result.summary(), savedPath);
         } catch (Exception ex) {
-            log.error("Failed to dispatch {} GIF", label, ex);
+            log.error("Failed to dispatch {} animation", label, ex);
         }
     }
 }

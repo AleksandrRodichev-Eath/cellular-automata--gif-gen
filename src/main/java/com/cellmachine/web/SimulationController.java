@@ -4,6 +4,7 @@ import com.cellmachine.generator.CellCoordinate;
 import com.cellmachine.generator.Rule;
 import com.cellmachine.generator.SimulationDimensions;
 import com.cellmachine.generator.SimulationOptions;
+import com.cellmachine.generator.SimulationOutputFormat;
 import com.cellmachine.generator.SimulationResult;
 import com.cellmachine.generator.SimulationService;
 import com.cellmachine.generator.SeedService;
@@ -13,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -59,9 +61,11 @@ public class SimulationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
         }
 
+        SimulationOutputFormat format = parseFormat(request.format());
+
         SimulationOptions options;
         try {
-            options = buildOptions(request, ruleLabel, rule, initMask, seedCoordinates, dimensions);
+            options = buildOptions(request, ruleLabel, rule, initMask, seedCoordinates, dimensions, format);
         } catch (IllegalArgumentException ex) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
         }
@@ -73,25 +77,32 @@ public class SimulationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Simulation failed: " + ex.getMessage(), ex);
         }
 
-        byte[] gifBytes = result.gifBytes();
+        byte[] mediaBytes = result.bytes();
         Path savedPath;
         try {
-            savedPath = simulationService.persistLastGif(gifBytes);
+            savedPath = simulationService.persistLastMedia(mediaBytes, result.format());
         } catch (IllegalStateException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex);
         }
 
         String message = buildMessage(result.summary(), request.caption());
         try {
-            telegramService.sendAnimation(result.fileName(), gifBytes, message);
+            telegramService.sendAnimation(result.fileName(), mediaBytes, message);
         } catch (IllegalStateException ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage(), ex);
         }
 
-        log.info("Generated GIF {} (steps {} -> {} alive {})", result.fileName(), result.stepsSimulated(), result.ruleLabel(), result.finalAlive());
+        log.info("Generated {} {} (steps {} -> {} alive {})",
+                result.format(),
+                result.fileName(),
+                result.stepsSimulated(),
+                result.ruleLabel(),
+                result.finalAlive());
 
         return new GenerateResponse(
                 result.fileName(),
+                result.format().name(),
+                result.mediaType(),
                 result.stepsRequested(),
                 result.stepsSimulated(),
                 result.finalAlive(),
@@ -156,20 +167,34 @@ public class SimulationController {
         return coordinates;
     }
 
+    private SimulationOutputFormat parseFormat(String format) {
+        if (!StringUtils.hasText(format)) {
+            return SimulationOutputFormat.GIF;
+        }
+        String normalized = format.trim().toUpperCase(Locale.ROOT);
+        try {
+            return SimulationOutputFormat.valueOf(normalized);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported format: " + format, ex);
+        }
+    }
+
     private SimulationOptions buildOptions(
             GenerateRequest request,
             String ruleLabel,
             Rule rule,
             boolean[] initMask,
             List<CellCoordinate> seedCells,
-            SimulationDimensions dimensions) {
+            SimulationDimensions dimensions,
+            SimulationOutputFormat format) {
         SimulationOptions.Builder builder = SimulationOptions.builder()
                 .rule(rule)
                 .ruleLabel(ruleLabel)
                 .dimensions(dimensions)
                 .wrap(request.wrap() == null || request.wrap())
                 .delayCs(request.delay() != null ? request.delay() : SimulationOptions.DEFAULT_DELAY_CS)
-                .randomSeed(request.randomSeed() != null ? request.randomSeed() : SeedService.DEFAULT_RANDOM_SEED);
+                .randomSeed(request.randomSeed() != null ? request.randomSeed() : SeedService.DEFAULT_RANDOM_SEED)
+                .outputFormat(format);
 
         if (request.steps() != null) {
             builder.steps(request.steps());

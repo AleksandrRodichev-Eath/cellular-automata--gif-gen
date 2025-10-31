@@ -19,6 +19,7 @@ public final class SimulationOptions {
     private final int delayCs;
     private final SimulationDimensions dimensions;
     private final long randomSeed;
+    private final SimulationOutputFormat outputFormat;
 
     private SimulationOptions(Builder builder) {
         this.steps = builder.steps;
@@ -31,6 +32,7 @@ public final class SimulationOptions {
         this.delayCs = builder.delayCs;
         this.dimensions = builder.dimensions;
         this.randomSeed = builder.randomSeed;
+        this.outputFormat = builder.outputFormat;
     }
 
     public int steps() {
@@ -73,6 +75,10 @@ public final class SimulationOptions {
         return randomSeed;
     }
 
+    public SimulationOutputFormat outputFormat() {
+        return outputFormat;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -88,6 +94,7 @@ public final class SimulationOptions {
         private int delayCs = DEFAULT_DELAY_CS;
         private SimulationDimensions dimensions = SimulationDimensions.defaults();
         private long randomSeed = SeedService.DEFAULT_RANDOM_SEED;
+        private SimulationOutputFormat outputFormat = SimulationOutputFormat.GIF;
 
         public Builder steps(int steps) {
             if (steps <= 0) {
@@ -153,12 +160,20 @@ public final class SimulationOptions {
             return this;
         }
 
+        public Builder outputFormat(SimulationOutputFormat outputFormat) {
+            this.outputFormat = Objects.requireNonNull(outputFormat, "outputFormat");
+            return this;
+        }
+
         public SimulationOptions build() {
             if (rule == null) {
                 throw new IllegalStateException("Rule must be provided");
             }
             if (!seedCells.isEmpty() && initMask != null) {
                 throw new IllegalStateException("Seed cells and init mask are mutually exclusive");
+            }
+            if (outputFormat == null) {
+                throw new IllegalStateException("Output format must be provided");
             }
             return new SimulationOptions(this);
         }

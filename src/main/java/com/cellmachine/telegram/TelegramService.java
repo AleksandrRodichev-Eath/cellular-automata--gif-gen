@@ -29,7 +29,7 @@ public class TelegramService {
         if (caption != null && !caption.isBlank()) {
             body.add("caption", caption);
         }
-        body.add("animation", new NamedByteArrayResource(fileName.endsWith(".gif") ? fileName : fileName + ".gif", bytes));
+        body.add("animation", new NamedByteArrayResource(fileName, bytes));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);

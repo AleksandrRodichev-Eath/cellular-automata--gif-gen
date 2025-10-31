@@ -2,6 +2,8 @@ package com.cellmachine.web;
 
 public record GenerateResponse(
         String fileName,
+        String format,
+        String mediaType,
         int stepsRequested,
         int stepsSimulated,
         int finalAlive,
@@ -18,6 +20,6 @@ public record GenerateResponse(
         long randomSeed,
         String summary,
         String message,
-        String lastGifPath
+        String lastMediaPath
 ) {
 }

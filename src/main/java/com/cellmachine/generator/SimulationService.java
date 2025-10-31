@@ -17,15 +17,18 @@ public class SimulationService {
 
     private static final String GIF_DIRECTORY = "gif";
     private static final String LAST_GIF_NAME = "last.gif";
+    private static final String MP4_DIRECTORY = "video";
+    private static final String LAST_MP4_NAME = "last.mp4";
 
     public static void main(String[] args) {
         SimulationOptions options = SimulationOptions.builder()
             .rule(Rule.parse("B3/S345"))
             .ruleLabel("B3/S12345")
+            .outputFormat(SimulationOutputFormat.MP4)
             .build();
         SimulationService simulationService = new SimulationService();
         SimulationResult result = simulationService.runSimulation(options);
-        simulationService.persistLastGif(result.gifBytes());
+        simulationService.persistLastMedia(result.bytes(), result.format());
     }
 
     public SimulationResult runSimulation(SimulationOptions options) {
@@ -34,6 +37,7 @@ public class SimulationService {
         boolean[] mask = options.initMask();
         List<CellCoordinate> seedCells = options.seedCells();
         Double density = options.density();
+        SimulationOutputFormat format = options.outputFormat();
 
         String initMaskLabel = mask == null ? null : SeedService.maskToLabel(mask);
         Integer seedCellCount = seedCells.isEmpty() ? null : seedCells.size();
@@ -45,7 +49,7 @@ public class SimulationService {
         Grid finalGrid = run.finalGrid();
         int finalAlive = finalGrid.aliveCount();
 
-        String baseName = defaultOutputName(options.ruleLabel(), mask, density);
+        String baseName = defaultOutputName(options.ruleLabel(), mask, density, format);
         String fileName = appendStepSuffix(baseName, run.stepsSimulated());
 
         String seedDescription = describeSeed(initMaskLabel, density, seedCellCount);
@@ -64,8 +68,9 @@ public class SimulationService {
                 options.randomSeed());
 
         return new SimulationResult(
-                run.gifBytes(),
+                run.bytes(),
                 fileName,
+                format,
                 options.steps(),
                 run.stepsSimulated(),
                 finalAlive,
@@ -82,16 +87,28 @@ public class SimulationService {
     }
 
     public Path persistLastGif(byte[] bytes) {
+        return persistLastMedia(bytes, SimulationOutputFormat.GIF);
+    }
+
+    public Path persistLastMedia(byte[] bytes, SimulationOutputFormat format) {
         Objects.requireNonNull(bytes, "bytes");
+        Objects.requireNonNull(format, "format");
         try {
-            Path dir = Path.of(GIF_DIRECTORY);
-            Files.createDirectories(dir);
-            Path path = dir.resolve(LAST_GIF_NAME);
-            Files.write(path, bytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            return path;
+            return switch (format) {
+                case GIF -> persist(bytes, GIF_DIRECTORY, LAST_GIF_NAME);
+                case MP4 -> persist(bytes, MP4_DIRECTORY, LAST_MP4_NAME);
+            };
         } catch (IOException ex) {
-            throw new IllegalStateException("Failed to persist GIF", ex);
+            throw new IllegalStateException("Failed to persist " + format.name() + " output", ex);
         }
+    }
+
+    private Path persist(byte[] bytes, String directory, String fileName) throws IOException {
+        Path dir = Path.of(directory);
+        Files.createDirectories(dir);
+        Path path = dir.resolve(fileName);
+        Files.write(path, bytes, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        return path;
     }
 
     private Grid buildInitialGrid(
@@ -131,34 +148,59 @@ public class SimulationService {
     }
 
     private SimulationRun renderSimulation(SimulationOptions options, Grid initialGrid) {
-        Grid current = initialGrid.copy();
-        int stepsSimulated = 0;
+        try {
+            return switch (options.outputFormat()) {
+                case GIF -> renderGif(options, initialGrid);
+                case MP4 -> renderMp4(options, initialGrid);
+            };
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to render simulation", ex);
+        }
+    }
 
+    private SimulationRun renderGif(SimulationOptions options, Grid initialGrid) throws IOException {
         try (ByteArrayOutputStream buffer = new ByteArrayOutputStream();
              GifWriter writer = new GifWriter(buffer,
                      options.dimensions().width(),
                      options.dimensions().height(),
                      options.dimensions().scale(),
                      options.delayCs())) {
-
-            writer.writeFrame(current);
-
-            for (int step = 0; step < options.steps(); step++) {
-                Grid next = Grid.advance(current, options.rule(), options.wrap());
-                writer.writeFrame(next);
-                stepsSimulated = step + 1;
-                if (next.equals(current)) {
-                    current = next;
-                    break;
-                }
-                current = next;
-            }
-
+            SimulationLoopResult loop = writeFrames(initialGrid, options, writer::writeFrame);
             writer.close();
-            return new SimulationRun(buffer.toByteArray(), current, stepsSimulated == 0 ? options.steps() : stepsSimulated);
-        } catch (IOException ex) {
-            throw new IllegalStateException("Failed to render simulation", ex);
+            return new SimulationRun(buffer.toByteArray(), loop.finalGrid(), loop.stepsSimulated());
         }
+    }
+
+    private SimulationRun renderMp4(SimulationOptions options, Grid initialGrid) throws IOException {
+        try (Mp4Writer writer = new Mp4Writer(
+                options.dimensions().width(),
+                options.dimensions().height(),
+                options.dimensions().scale(),
+                options.delayCs())) {
+            SimulationLoopResult loop = writeFrames(initialGrid, options, writer::writeFrame);
+            writer.close();
+            return new SimulationRun(writer.toByteArray(), loop.finalGrid(), loop.stepsSimulated());
+        }
+    }
+
+    private SimulationLoopResult writeFrames(Grid initialGrid, SimulationOptions options, FrameConsumer frameConsumer) throws IOException {
+        Grid current = initialGrid.copy();
+        frameConsumer.writeFrame(current);
+        int stepsSimulated = 0;
+        for (int step = 0; step < options.steps(); step++) {
+            Grid next = Grid.advance(current, options.rule(), options.wrap());
+            frameConsumer.writeFrame(next);
+            stepsSimulated = step + 1;
+            if (next.equals(current)) {
+                current = next;
+                break;
+            }
+            current = next;
+        }
+        if (stepsSimulated == 0) {
+            stepsSimulated = options.steps();
+        }
+        return new SimulationLoopResult(current, stepsSimulated);
     }
 
     private Double determineEffectiveDensity(boolean[] mask, Double density, List<CellCoordinate> seedCells) {
@@ -171,7 +213,7 @@ public class SimulationService {
         return density != null ? density : SeedService.DEFAULT_RANDOM_DENSITY;
     }
 
-    private String defaultOutputName(String rule, boolean[] mask, Double density) {
+    private String defaultOutputName(String rule, boolean[] mask, Double density, SimulationOutputFormat format) {
         String ruleComponent = sanitizeRule(rule);
         List<String> components = new ArrayList<>();
         if (ruleComponent.isEmpty()) {
@@ -185,7 +227,9 @@ public class SimulationService {
         if (density != null) {
             components.add(formatDensity(density));
         }
-        return String.join("_", components) + ".gif";
+        String base = String.join("_", components);
+        String extension = format.fileExtension();
+        return base + "." + extension;
     }
 
     private String describeSeed(String initMaskLabel, Double density, Integer seedCellCount) {
@@ -272,14 +316,22 @@ public class SimulationService {
         return Integer.toString((int) percent);
     }
 
-    private record SimulationRun(byte[] gifBytes, Grid finalGrid, int stepsSimulated) {
+    @FunctionalInterface
+    private interface FrameConsumer {
+        void writeFrame(Grid grid) throws IOException;
+    }
+
+    private record SimulationLoopResult(Grid finalGrid, int stepsSimulated) {
+    }
+
+    private record SimulationRun(byte[] bytes, Grid finalGrid, int stepsSimulated) {
         SimulationRun {
-            gifBytes = gifBytes.clone();
+            bytes = bytes.clone();
         }
 
         @Override
-        public byte[] gifBytes() {
-            return gifBytes.clone();
+        public byte[] bytes() {
+            return bytes.clone();
         }
     }
 }

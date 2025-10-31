@@ -1,8 +1,9 @@
 package com.cellmachine.generator;
 
 public record SimulationResult(
-        byte[] gifBytes,
+        byte[] bytes,
         String fileName,
+        SimulationOutputFormat format,
         int stepsRequested,
         int stepsSimulated,
         int finalAlive,
@@ -18,11 +19,15 @@ public record SimulationResult(
         String summary
 ) {
     public SimulationResult {
-        gifBytes = gifBytes.clone();
+        bytes = bytes.clone();
     }
 
     @Override
-    public byte[] gifBytes() {
-        return gifBytes.clone();
+    public byte[] bytes() {
+        return bytes.clone();
+    }
+
+    public String mediaType() {
+        return format.mediaType();
     }
 }

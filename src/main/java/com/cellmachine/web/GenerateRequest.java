@@ -14,6 +14,7 @@ public record GenerateRequest(
         Integer height,
         Integer scale,
         String caption,
-        Long randomSeed
+        Long randomSeed,
+        String format
 ) {
 }
