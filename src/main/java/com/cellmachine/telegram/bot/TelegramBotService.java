@@ -1,6 +1,8 @@
 package com.cellmachine.telegram.bot;
 
 import com.cellmachine.generator.Palette2D;
+import com.cellmachine.generator.RandomSimulationFactory;
+import com.cellmachine.generator.RandomSimulationFactory.RandomSelection;
 import com.cellmachine.generator.Rule;
 import com.cellmachine.generator.SeedService;
 import com.cellmachine.generator.SimulationDimensions;
@@ -147,7 +149,7 @@ public class TelegramBotService {
 
     private void promptModeSelection(ChatSession session) {
         InlineKeyboardMarkupDto keyboard = new InlineKeyboardMarkupDto(List.of(
-                List.of(button("Manual", "MODE_MANUAL"), button("Manual advanced", "MODE_ADVANCED")),
+                List.of(button("Manual", "MODE_MANUAL"), button("Manual advanced", "MODE_ADVANCED"), button("Random", "MODE_RANDOM")),
                 List.of(button("Paste options", "MODE_PASTE"))
         ));
         TelegramMessageDto message = telegramService.sendMessage(
@@ -174,6 +176,7 @@ public class TelegramBotService {
                 session.step(ConversationStep.WAITING_FOR_B);
                 telegramService.sendMessage(session.chatId(), "Enter digits for the B part (0-8, no spaces):");
             }
+            case "MODE_RANDOM" -> startRandomSelection(session);
             case "MODE_PASTE" -> {
                 session.simpleRuleMode(false);
                 session.step(ConversationStep.WAITING_FOR_SERIALIZED_OPTIONS);
@@ -220,6 +223,33 @@ public class TelegramBotService {
         telegramService.sendMessage(
                 session.chatId(),
                 "Using 200x200 grid, 200 steps, density 0.05, wrap on, palette casioBasic.");
+        startGeneration(session);
+    }
+
+    private void startRandomSelection(ChatSession session) {
+        session.simpleRuleMode(false);
+        session.clearPresetOptions();
+
+        RandomSelection selection = RandomSimulationFactory.create();
+        boolean[] mask = selection.mask();
+
+        session.birthDigits(selection.birthDigits());
+        session.survivalDigits(selection.survivalDigits());
+        session.dimensions(200, 200);
+        session.steps(100);
+        session.density(0.05d);
+        session.mask(mask);
+        session.wrap(true);
+        session.palette(Palette2D.casioBasic);
+
+        String ruleLabel = selection.ruleLabel();
+        String message = """
+                Random mode selected:
+                Rule: %s
+                Mask: %s
+                Using 200x200 grid, 100 steps, density 0.05, wrap on, palette casioBasic.
+                """.formatted(ruleLabel, selection.maskLabel());
+        telegramService.sendMessage(session.chatId(), message);
         startGeneration(session);
     }
 
@@ -522,7 +552,7 @@ public class TelegramBotService {
                     log.warn("Failed to delete loading message {} for chat {}", loadingMessageId, chatId, ex);
                 }
             }
-            sessions.compute(chatId, (id, existing) -> existing == sessionReference ? null : existing);
+            resetSessionAndPrompt(chatId, sessionReference);
         }
     }
 
@@ -534,6 +564,23 @@ public class TelegramBotService {
             telegramService.editMessageReplyMarkup(message.chat().id(), message.messageId(), null);
         } catch (Exception ex) {
             log.debug("Failed to remove inline keyboard for message {}", message.messageId(), ex);
+        }
+    }
+
+    private void resetSessionAndPrompt(long chatId, ChatSession sessionReference) {
+        ChatSession[] newSessionHolder = new ChatSession[1];
+        sessions.compute(chatId, (id, existing) -> {
+            if (existing == sessionReference) {
+                ChatSession fresh = new ChatSession(chatId);
+                fresh.resetConfiguration();
+                newSessionHolder[0] = fresh;
+                return fresh;
+            }
+            return existing;
+        });
+        ChatSession newSession = newSessionHolder[0];
+        if (newSession != null) {
+            promptModeSelection(newSession);
         }
     }
 

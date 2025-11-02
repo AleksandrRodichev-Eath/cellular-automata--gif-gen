@@ -4,7 +4,7 @@ public record SimulationDimensions(int width, int height, int scale) {
 
     public static final int DEFAULT_WORLD_WIDTH = 200;
     public static final int DEFAULT_WORLD_HEIGHT = 200;
-    public static final int DEFAULT_SCALE = 6;
+    public static final int DEFAULT_SCALE = 4;
 
     public SimulationDimensions {
         if (width <= 0 || height <= 0 || scale <= 0) {

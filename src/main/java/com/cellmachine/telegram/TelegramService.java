@@ -6,6 +6,7 @@ import com.cellmachine.telegram.dto.TelegramApiResponse;
 import com.cellmachine.telegram.dto.TelegramMessageDto;
 import com.cellmachine.telegram.dto.TelegramUpdateDto;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
@@ -19,10 +20,15 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class TelegramService {
 
+    private static final Logger log = LoggerFactory.getLogger(TelegramService.class);
     private static final ParameterizedTypeReference<TelegramApiResponse<TelegramMessageDto>> MESSAGE_RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {
             };
@@ -96,6 +102,7 @@ public class TelegramService {
     }
 
     private void sendAnimationInternal(Object chatId, String fileName, byte[] bytes, String caption) {
+        long sizeBytes = bytes.length;
         String url = buildApiUrl("sendAnimation");
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
         body.add("chat_id", chatId);
@@ -114,8 +121,35 @@ public class TelegramService {
                 throw new IllegalStateException("Telegram API responded with status " + response.getStatusCode());
             }
         } catch (RestClientException ex) {
+            if (isPayloadTooLarge(ex)) {
+                notifyOversizeAnimation(chatId, sizeBytes);
+            }
             throw new IllegalStateException("Failed to send animation to Telegram", ex);
         }
+    }
+
+    private boolean isPayloadTooLarge(RestClientException ex) {
+        if (ex instanceof HttpClientErrorException clientEx) {
+            return clientEx.getStatusCode().value() == HttpStatus.PAYLOAD_TOO_LARGE.value();
+        }
+        return false;
+    }
+
+    private void notifyOversizeAnimation(Object chatId, long sizeBytes) {
+        String readable = String.format(Locale.US, "%.1f MB", sizeBytes / (1024.0 * 1024.0));
+        String message = "Animation is too large to send (" + readable + ").";
+        try {
+            sendSimpleMessage(chatId, message);
+        } catch (Exception notifyEx) {
+            log.warn("Failed to notify chat {} about oversize animation", chatId, notifyEx);
+        }
+    }
+
+    private void sendSimpleMessage(Object chatId, String text) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("chat_id", chatId);
+        payload.put("text", text);
+        postForResult("sendMessage", payload, MESSAGE_RESPONSE_TYPE);
     }
 
     private String ensureFileName(String fileName) {

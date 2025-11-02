@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -35,6 +37,7 @@ public class SimulationService {
 
     public SimulationResult runSimulation(SimulationOptions options) {
         Objects.requireNonNull(options, "options");
+        long start = System.nanoTime();
         SimulationDimensions dimensions = options.dimensions();
         boolean[] mask = options.initMask();
         List<CellCoordinate> seedCells = options.seedCells();
@@ -57,7 +60,7 @@ public class SimulationService {
 
         String summary = buildSummary(options);
 
-        return new SimulationResult(
+        SimulationResult simulationResult = new SimulationResult(
                 run.bytes(),
                 fileName,
                 format,
@@ -75,6 +78,20 @@ public class SimulationService {
                 seedCellCount,
                 options.randomSeed(),
                 summary);
+        Duration spent = Duration.ofNanos(System.nanoTime() - start);
+        long sizeBytes = simulationResult.bytes().length;
+        double sizeKb = sizeBytes / 1024.0;
+        double seconds = spent.toNanos() / 1_000_000_000.0;
+        String sizeLabel = String.format(Locale.US, "%.1f KB", sizeKb);
+        String timeLabel = String.format(Locale.US, "%.1f s", seconds);
+        log.info(
+                "Simulation {} {}: {} (size={}, spent={})",
+                simulationResult.fileName(),
+                simulationResult.format(),
+                summary,
+                sizeLabel,
+                timeLabel);
+        return simulationResult;
     }
 
     public Path persistLastMedia(byte[] bytes, SimulationOutputFormat format) {

@@ -23,7 +23,7 @@ public final class SimulationOptions {
     private static final String NULL_TOKEN = "-";
 
     private final Palette2D palette;
-    private final Integer progressLogPercentStep;
+    private final Integer progressLogPercentStep = 10;
 
     private SimulationOptions(Builder builder) {
         this.steps = builder.steps;
@@ -38,7 +38,7 @@ public final class SimulationOptions {
         this.randomSeed = builder.randomSeed;
         this.outputFormat = builder.outputFormat;
         this.palette = builder.palette;
-        this.progressLogPercentStep = builder.progressLogPercentStep;
+//        this.progressLogPercentStep = builder.progressLogPercentStep;
     }
 
     public int steps() {
