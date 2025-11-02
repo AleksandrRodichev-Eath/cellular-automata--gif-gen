@@ -16,8 +16,8 @@
             },
             "args": [],
             "env": {
-                "TELEGRAM_BOT_TOKEN": "8132408470:AAFS0HljpiLHPf6NGzmXIHP_JToclcWW7zQ",
-                "TELEGRAM_CHAT_ID": -1003215193955
+                "TELEGRAM_BOT_TOKEN": "",
+                "TELEGRAM_CHAT_ID": -
             }
         }
     ]
