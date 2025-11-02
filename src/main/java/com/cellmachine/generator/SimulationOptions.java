@@ -21,6 +21,7 @@ public final class SimulationOptions {
     private final long randomSeed;
     private final SimulationOutputFormat outputFormat;
     private final Palette2D palette;
+    private final Integer progressLogPercentStep = 10;
 
     private SimulationOptions(Builder builder) {
         this.steps = builder.steps;
@@ -35,6 +36,7 @@ public final class SimulationOptions {
         this.randomSeed = builder.randomSeed;
         this.outputFormat = builder.outputFormat;
         this.palette = builder.palette;
+//        this.progressLogPercentStep = builder.progressLogPercentStep;
     }
 
     public int steps() {
@@ -85,6 +87,10 @@ public final class SimulationOptions {
         return palette;
     }
 
+    public Integer progressLogPercentStep() {
+        return progressLogPercentStep;
+    }
+
     public static Builder builder() {
         return new Builder();
     }
@@ -100,8 +106,9 @@ public final class SimulationOptions {
         private int delayCs = DEFAULT_DELAY_CS;
         private SimulationDimensions dimensions = SimulationDimensions.defaults();
         private long randomSeed = SeedService.DEFAULT_RANDOM_SEED;
-        private SimulationOutputFormat outputFormat = SimulationOutputFormat.GIF;
+        private SimulationOutputFormat outputFormat = SimulationOutputFormat.MP4;
         private Palette2D palette = Palette2D.ysConcreteJungle;
+        private Integer progressLogPercentStep;
 
         public Builder steps(int steps) {
             if (steps <= 0) {
@@ -174,6 +181,16 @@ public final class SimulationOptions {
 
         public Builder palette(Palette2D palette) {
             this.palette = Objects.requireNonNull(palette, "palette");
+            return this;
+        }
+
+        public Builder progressLogPercentStep(Integer percentStep) {
+            if (percentStep != null) {
+                if (percentStep <= 0 || percentStep > 100) {
+                    throw new IllegalArgumentException("Progress log percent step must be between 1 and 100");
+                }
+            }
+            this.progressLogPercentStep = percentStep;
             return this;
         }
 

@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,6 +21,7 @@ public class SimulationService {
     private static final String LAST_GIF_NAME = "last.gif";
     private static final String MP4_DIRECTORY = "video";
     private static final String LAST_MP4_NAME = "last.mp4";
+    private static final Logger log = LoggerFactory.getLogger(SimulationService.class);
 
     public static void main(String[] args) {
         SimulationOptions options = SimulationOptions.builder()
@@ -86,10 +89,6 @@ public class SimulationService {
                 seedCellCount,
                 options.randomSeed(),
                 summary);
-    }
-
-    public Path persistLastGif(byte[] bytes) {
-        return persistLastMedia(bytes, SimulationOutputFormat.GIF);
     }
 
     public Path persistLastMedia(byte[] bytes, SimulationOutputFormat format) {
@@ -190,10 +189,19 @@ public class SimulationService {
     private SimulationLoopResult writeFrames(Grid initialGrid, SimulationOptions options, FrameConsumer frameConsumer) throws IOException {
         Grid current = initialGrid.copy();
         frameConsumer.writeFrame(current);
+        int framesRendered = 1;
+        ProgressLogger progressLogger = ProgressLogger.create(options.progressLogPercentStep(), options.steps() + 1);
+        if (progressLogger != null) {
+            progressLogger.record(framesRendered);
+        }
         int stepsSimulated = 0;
         for (int step = 0; step < options.steps(); step++) {
             Grid next = Grid.advance(current, options.rule(), options.wrap());
             frameConsumer.writeFrame(next);
+            framesRendered++;
+            if (progressLogger != null) {
+                progressLogger.record(framesRendered);
+            }
             stepsSimulated = step + 1;
             if (next.equals(current)) {
                 current = next;
@@ -318,6 +326,44 @@ public class SimulationService {
         double percent = Math.round(density * 100.0);
         percent = Math.max(0.0, Math.min(100.0, percent));
         return Integer.toString((int) percent);
+    }
+
+    private static final class ProgressLogger {
+        private final int totalFrames;
+        private final int stepPercent;
+        private int nextPercent;
+        private int lastLoggedPercent;
+
+        private ProgressLogger(int totalFrames, int stepPercent) {
+            this.totalFrames = Math.max(totalFrames, 1);
+            this.stepPercent = stepPercent;
+            this.nextPercent = stepPercent;
+            this.lastLoggedPercent = 0;
+        }
+
+        static ProgressLogger create(Integer requestedPercentStep, int totalFrames) {
+            if (requestedPercentStep == null) {
+                return null;
+            }
+            return new ProgressLogger(totalFrames, requestedPercentStep);
+        }
+
+        void record(int framesRendered) {
+            if (totalFrames <= 0) {
+                return;
+            }
+            int percent = (int) Math.floor(framesRendered * 100.0 / totalFrames);
+            percent = Math.min(percent, 100);
+            while (nextPercent <= 100 && percent >= nextPercent) {
+                log.info("Rendered {}% of frames ({}/{}).", nextPercent, framesRendered, totalFrames);
+                lastLoggedPercent = nextPercent;
+                nextPercent += stepPercent;
+            }
+            if (percent == 100 && lastLoggedPercent < 100) {
+                log.info("Rendered 100% of frames ({}/{}).", framesRendered, totalFrames);
+                lastLoggedPercent = 100;
+            }
+        }
     }
 
     @FunctionalInterface
