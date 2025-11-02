@@ -15,6 +15,8 @@ class SimulationServiceTest {
                 .steps(5)
                 .delayCs(2)
                 .wrap(true)
+                .palette(Palette2D.ysConcreteJungle)
+                .outputFormat(SimulationOutputFormat.GIF)
                 .build();
 
         SimulationResult result = service.runSimulation(options);
@@ -24,6 +26,7 @@ class SimulationServiceTest {
         assertEquals("B3/S23", result.ruleLabel());
         assertNotNull(result.summary());
         assertEquals(Palette2D.ysConcreteJungle, result.palette());
+        assertEquals(options.serialize(), result.summary());
     }
 
     @Test
@@ -43,5 +46,6 @@ class SimulationServiceTest {
         assertTrue(result.bytes().length > 0);
         assertTrue(result.fileName().endsWith(".mp4"));
         assertEquals(3, result.stepsRequested());
+        assertEquals(options.serialize(), result.summary());
     }
 }

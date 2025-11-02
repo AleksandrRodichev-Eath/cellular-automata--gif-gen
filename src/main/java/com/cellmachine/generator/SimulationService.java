@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 
 import org.slf4j.Logger;
@@ -56,20 +55,7 @@ public class SimulationService {
         String baseName = defaultOutputName(options.ruleLabel(), mask, density, format);
         String fileName = appendStepSuffix(baseName, run.stepsSimulated());
 
-        String seedDescription = describeSeed(initMaskLabel, density, seedCellCount);
-        boolean usedRandomness = seedCells.isEmpty() && (mask == null || density != null);
-        String summary = buildSummary(
-                options.steps(),
-                run.stepsSimulated(),
-                options.ruleLabel(),
-                finalAlive,
-                fileName,
-                dimensions,
-                options.wrap(),
-                options.delayCs(),
-                seedDescription,
-                usedRandomness,
-                options.randomSeed());
+        String summary = buildSummary(options);
 
         return new SimulationResult(
                 run.bytes(),
@@ -244,61 +230,8 @@ public class SimulationService {
         return base + "." + extension;
     }
 
-    private String describeSeed(String initMaskLabel, Double density, Integer seedCellCount) {
-        if (seedCellCount != null) {
-            return "manual coordinates (" + seedCellCount + " points)";
-        }
-        if (initMaskLabel != null) {
-            if (density != null) {
-                return String.format(Locale.US, "mask %s randomized at %.1f%%", initMaskLabel, density * 100.0);
-            }
-            return "mask " + initMaskLabel + " centered";
-        }
-        double effective = density != null ? density : SeedService.DEFAULT_RANDOM_DENSITY;
-        return String.format(Locale.US, "random %.1f%% density", effective * 100.0);
-    }
-
-    private String buildSummary(
-            int stepsRequested,
-            int stepsSimulated,
-            String ruleLabel,
-            int finalAlive,
-            String fileName,
-            SimulationDimensions dimensions,
-            boolean wrap,
-            int delayCs,
-            String seedDescription,
-            boolean usedRandomness,
-            long randomSeed) {
-        String wrapLabel = wrap ? "toroidal wrap" : "bounded edges";
-        StringBuilder builder = new StringBuilder();
-        builder.append(String.format(
-                Locale.US,
-                "Simulated %d generations (requested %d) using rule %s.",
-                stepsSimulated,
-                stepsRequested,
-                ruleLabel));
-        builder.append(' ');
-        builder.append("Final alive cells: ").append(finalAlive).append('.')
-                .append(' ');
-        builder.append(String.format(
-                Locale.US,
-                "Grid %dx%d (scale %d, %s).",
-                dimensions.width(),
-                dimensions.height(),
-                dimensions.scale(),
-                wrapLabel));
-        builder.append(' ');
-        builder.append("Frame delay: ").append(delayCs).append("cs.");
-        builder.append(' ');
-        builder.append("Seed: ").append(seedDescription).append('.');
-        if (usedRandomness) {
-            builder.append(' ');
-            builder.append("RNG seed: ").append(randomSeed).append('.');
-        }
-        builder.append(' ');
-        builder.append("File tag: ").append(fileName).append('.');
-        return builder.toString();
+    private String buildSummary(SimulationOptions options) {
+        return options.serialize();
     }
 
     private String appendStepSuffix(String name, int steps) {

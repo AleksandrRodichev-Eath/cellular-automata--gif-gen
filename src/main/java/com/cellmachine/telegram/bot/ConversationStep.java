@@ -1,6 +1,7 @@
 package com.cellmachine.telegram.bot;
 
 public enum ConversationStep {
+    CHOOSING_MODE,
     WAITING_FOR_B,
     WAITING_FOR_S,
     CHOOSING_SIZE,
@@ -10,6 +11,7 @@ public enum ConversationStep {
     WAITING_FOR_MANUAL_DENSITY,
     CHOOSING_MASK_ACTION,
     WAITING_FOR_MASK_INPUT,
+    WAITING_FOR_SERIALIZED_OPTIONS,
     CHOOSING_WRAP,
     CHOOSING_PALETTE,
     GENERATING

@@ -11,8 +11,8 @@ public enum Palette2D {
     razSandwich("#400927", "#ffe1c5"),
     cgaPastel("#360072", "#ffbf83");
 
-    String deadColor;
-    String aliveColor;
+    final String deadColor;
+    final String aliveColor;
 
     Palette2D(String deadColor, String aliveColor) {
         this.deadColor = deadColor;

@@ -1,13 +1,14 @@
 package com.cellmachine.telegram.bot;
 
 import com.cellmachine.generator.Palette2D;
+import com.cellmachine.generator.SimulationOptions;
 import java.time.Instant;
 import java.util.Arrays;
 
 public class ChatSession {
 
     private final long chatId;
-    private ConversationStep step = ConversationStep.WAITING_FOR_B;
+    private ConversationStep step = ConversationStep.CHOOSING_MODE;
     private Instant lastInteraction = Instant.now();
 
     private String birthDigits;
@@ -21,6 +22,8 @@ public class ChatSession {
     private Palette2D palette;
     private Integer lastPromptMessageId;
     private Integer loadingMessageId;
+    private boolean simpleRuleMode;
+    private SimulationOptions presetOptions;
 
     public ChatSession(long chatId) {
         this.chatId = chatId;
@@ -148,6 +151,9 @@ public class ChatSession {
     }
 
     public boolean isReadyForGeneration() {
+        if (presetOptions != null) {
+            return true;
+        }
         return birthDigits != null
                 && survivalDigits != null
                 && width != null
@@ -173,7 +179,49 @@ public class ChatSession {
         copy.palette = this.palette;
         copy.lastPromptMessageId = this.lastPromptMessageId;
         copy.loadingMessageId = this.loadingMessageId;
+        copy.presetOptions = this.presetOptions;
+        copy.simpleRuleMode = this.simpleRuleMode;
         return copy;
+    }
+
+    public SimulationOptions presetOptions() {
+        return presetOptions;
+    }
+
+    public void presetOptions(SimulationOptions presetOptions) {
+        this.presetOptions = presetOptions;
+        markInteraction();
+    }
+
+    public void clearPresetOptions() {
+        this.presetOptions = null;
+        markInteraction();
+    }
+
+    public boolean simpleRuleMode() {
+        return simpleRuleMode;
+    }
+
+    public void simpleRuleMode(boolean simpleRuleMode) {
+        this.simpleRuleMode = simpleRuleMode;
+        markInteraction();
+    }
+
+    public void resetConfiguration() {
+        this.birthDigits = null;
+        this.survivalDigits = null;
+        this.width = null;
+        this.height = null;
+        this.steps = null;
+        this.density = null;
+        this.mask = null;
+        this.wrap = null;
+        this.palette = null;
+        this.presetOptions = null;
+        this.lastPromptMessageId = null;
+        this.loadingMessageId = null;
+        this.simpleRuleMode = false;
+        markInteraction();
     }
 
     @Override

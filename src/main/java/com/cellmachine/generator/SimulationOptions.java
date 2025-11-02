@@ -20,8 +20,10 @@ public final class SimulationOptions {
     private final SimulationDimensions dimensions;
     private final long randomSeed;
     private final SimulationOutputFormat outputFormat;
+    private static final String NULL_TOKEN = "-";
+
     private final Palette2D palette;
-    private final Integer progressLogPercentStep = 10;
+    private final Integer progressLogPercentStep;
 
     private SimulationOptions(Builder builder) {
         this.steps = builder.steps;
@@ -36,7 +38,7 @@ public final class SimulationOptions {
         this.randomSeed = builder.randomSeed;
         this.outputFormat = builder.outputFormat;
         this.palette = builder.palette;
-//        this.progressLogPercentStep = builder.progressLogPercentStep;
+        this.progressLogPercentStep = builder.progressLogPercentStep;
     }
 
     public int steps() {
@@ -91,8 +93,174 @@ public final class SimulationOptions {
         return progressLogPercentStep;
     }
 
+    public String serialize() {
+        List<String> parts = new ArrayList<>();
+        parts.add(Integer.toString(steps));
+        String[] ruleParts = rule.label().split("/", -1);
+        if (ruleParts.length != 2) {
+            throw new IllegalStateException("Rule label must contain born/survive segments");
+        }
+        parts.add(ruleParts[0]);
+        parts.add(ruleParts[1]);
+        String ruleLabelPart = ruleLabel == null || ruleLabel.equals(ruleParts[0] + "/" + ruleParts[1])
+                ? NULL_TOKEN
+                : ruleLabel;
+        parts.add(ruleLabelPart);
+        parts.add(density == null ? NULL_TOKEN : Double.toString(density));
+        parts.add(initMask == null ? NULL_TOKEN : SeedService.maskToLabel(initMask));
+        parts.add(seedCells.isEmpty() ? NULL_TOKEN : serializeSeedCells(seedCells));
+        parts.add(wrap ? "1" : "0");
+        parts.add(Integer.toString(delayCs));
+        parts.add(Integer.toString(dimensions.width()));
+        parts.add(Integer.toString(dimensions.height()));
+        parts.add(Integer.toString(dimensions.scale()));
+        parts.add(Long.toString(randomSeed));
+        parts.add(palette.name());
+        return String.join("_", parts);
+    }
+
+    public static SimulationOptions deserialize(String serialized) {
+        Objects.requireNonNull(serialized, "serialized");
+        String[] parts = serialized.split("_", -1);
+        if (parts.length != 14) {
+            throw new IllegalArgumentException("Serialized options must contain 14 parts but found " + parts.length);
+        }
+        int idx = 0;
+        int steps = parseInt(parts[idx++], "steps");
+        String bornSegment = requireToken(parts[idx++], "rule born segment");
+        String surviveSegment = requireToken(parts[idx++], "rule survive segment");
+        String serializedRule = bornSegment + "/" + surviveSegment;
+        String ruleLabelToken = parts[idx++];
+        String ruleLabel = (ruleLabelToken == null || ruleLabelToken.isEmpty() || NULL_TOKEN.equals(ruleLabelToken))
+                ? serializedRule
+                : ruleLabelToken;
+        Double density = parseDouble(parts[idx++]);
+        boolean[] initMask = parseInitMask(parts[idx++]);
+        List<CellCoordinate> seedCells = parseSeedCells(parts[idx++]);
+        boolean wrap = parseBoolean(parts[idx++]);
+        int delayCs = parseInt(parts[idx++], "delay");
+        int width = parseInt(parts[idx++], "width");
+        int height = parseInt(parts[idx++], "height");
+        int scale = parseInt(parts[idx++], "scale");
+        long randomSeed = parseLong(parts[idx++], "random seed");
+        Palette2D palette = Palette2D.valueOf(requireToken(parts[idx], "palette"));
+
+        SimulationOptions.Builder builder = SimulationOptions.builder()
+                .steps(steps)
+                .rule(Rule.parse(bornSegment + "/" + surviveSegment))
+                .ruleLabel(ruleLabel)
+                .wrap(wrap)
+                .delayCs(delayCs)
+                .dimensions(new SimulationDimensions(width, height, scale))
+                .randomSeed(randomSeed)
+                .outputFormat(SimulationOutputFormat.MP4)
+                .palette(palette);
+        if (density != null) {
+            builder.density(density);
+        }
+        if (initMask != null) {
+            builder.initMask(initMask);
+        }
+        if (!seedCells.isEmpty()) {
+            builder.seedCells(seedCells);
+        }
+        return builder.build();
+    }
+
     public static Builder builder() {
         return new Builder();
+    }
+
+    private static String serializeSeedCells(List<CellCoordinate> cells) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < cells.size(); i++) {
+            CellCoordinate coordinate = cells.get(i);
+            if (i > 0) {
+                builder.append(';');
+            }
+            builder.append(coordinate.x()).append(':').append(coordinate.y());
+        }
+        return builder.toString();
+    }
+
+    private static String requireToken(String value, String label) {
+        if (value == null || value.isEmpty() || NULL_TOKEN.equals(value)) {
+            throw new IllegalArgumentException(label + " is missing in serialized options");
+        }
+        return value;
+    }
+
+    private static Double parseDouble(String value) {
+        if (value == null || value.isEmpty() || NULL_TOKEN.equals(value)) {
+            return null;
+        }
+        return Double.valueOf(value);
+    }
+
+    private static Integer parseInteger(String value) {
+        if (value == null || value.isEmpty() || NULL_TOKEN.equals(value)) {
+            return null;
+        }
+        return Integer.valueOf(value);
+    }
+
+    private static int parseInt(String value, String label) {
+        try {
+            return Integer.parseInt(requireToken(value, label));
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Invalid " + label + " value: '" + value + "'", ex);
+        }
+    }
+
+    private static long parseLong(String value, String label) {
+        try {
+            return Long.parseLong(requireToken(value, label));
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Invalid " + label + " value: '" + value + "'", ex);
+        }
+    }
+
+    private static boolean[] parseInitMask(String value) {
+        if (value == null || value.isEmpty() || NULL_TOKEN.equals(value)) {
+            return null;
+        }
+        return SeedService.parseInitMask(value);
+    }
+
+    private static List<CellCoordinate> parseSeedCells(String value) {
+        List<CellCoordinate> cells = new ArrayList<>();
+        if (value == null || value.isEmpty() || NULL_TOKEN.equals(value)) {
+            return cells;
+        }
+        String[] entries = value.split(";", -1);
+        for (String entry : entries) {
+            if (entry.isEmpty()) {
+                continue;
+            }
+            String[] coordinates = entry.split(":", -1);
+            if (coordinates.length != 2) {
+                throw new IllegalArgumentException("Invalid seed cell entry '" + entry + "'");
+            }
+            try {
+                int x = Integer.parseInt(coordinates[0]);
+                int y = Integer.parseInt(coordinates[1]);
+                cells.add(new CellCoordinate(x, y));
+            } catch (NumberFormatException ex) {
+                throw new IllegalArgumentException("Invalid seed cell entry '" + entry + "'", ex);
+            }
+        }
+        return cells;
+    }
+
+    private static boolean parseBoolean(String value) {
+        String token = requireToken(value, "wrap");
+        if ("1".equals(token) || "true".equalsIgnoreCase(token)) {
+            return true;
+        }
+        if ("0".equals(token) || "false".equalsIgnoreCase(token)) {
+            return false;
+        }
+        throw new IllegalArgumentException("Invalid boolean value '" + value + "'");
     }
 
     public static final class Builder {
