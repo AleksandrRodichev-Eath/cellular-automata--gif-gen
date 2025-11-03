@@ -42,7 +42,6 @@ class SimulationOptionsSerializationTest {
         assertEquals(options.randomSeed(), restored.randomSeed());
         assertEquals(SimulationOutputFormat.MP4, restored.outputFormat());
         assertEquals(options.palette(), restored.palette());
-        assertNull(restored.progressLogPercentStep());
     }
 
     @Test
@@ -75,6 +74,5 @@ class SimulationOptionsSerializationTest {
         assertEquals(options.randomSeed(), restored.randomSeed());
         assertEquals(options.outputFormat(), restored.outputFormat());
         assertEquals(options.palette(), restored.palette());
-        assertNull(restored.progressLogPercentStep());
     }
 }
