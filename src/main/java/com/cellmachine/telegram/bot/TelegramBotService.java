@@ -149,7 +149,14 @@ public class TelegramBotService {
 
     private void promptModeSelection(ChatSession session) {
         InlineKeyboardMarkupDto keyboard = new InlineKeyboardMarkupDto(List.of(
-                List.of(button("Manual", "MODE_MANUAL"), button("Manual advanced", "MODE_ADVANCED"), button("Random", "MODE_RANDOM")),
+                List.of(
+                        button("Manual", "MODE_MANUAL"),
+                        button("Manual advanced", "MODE_ADVANCED")
+                ),
+                List.of(
+                    button("Random", "MODE_RANDOM"),
+                    button("Random mask", "MODE_RANDOM_MASK")
+                ),
                 List.of(button("Paste options", "MODE_PASTE"))
         ));
         TelegramMessageDto message = telegramService.sendMessage(
@@ -177,6 +184,7 @@ public class TelegramBotService {
                 telegramService.sendMessage(session.chatId(), "Enter digits for the B part (0-8, no spaces):");
             }
             case "MODE_RANDOM" -> startRandomSelection(session);
+            case "MODE_RANDOM_MASK" -> startRandomMaskSelection(session);
             case "MODE_PASTE" -> {
                 session.simpleRuleMode(false);
                 session.step(ConversationStep.WAITING_FOR_SERIALIZED_OPTIONS);
@@ -231,23 +239,40 @@ public class TelegramBotService {
         session.clearPresetOptions();
 
         RandomSelection selection = RandomSimulationFactory.create();
-        boolean[] mask = selection.mask();
 
         session.birthDigits(selection.birthDigits());
         session.survivalDigits(selection.survivalDigits());
         session.dimensions(200, 200);
         session.steps(100);
         session.density(0.05d);
+        session.wrap(true);
+        session.palette(Palette2D.paperback2);
+
+        startGeneration(session);
+    }
+
+    private void startRandomMaskSelection(ChatSession session) {
+        session.simpleRuleMode(false);
+        session.clearPresetOptions();
+
+        RandomSelection selection = RandomSimulationFactory.create();
+        boolean[] mask = selection.mask();
+
+        session.birthDigits(selection.birthDigits());
+        session.survivalDigits(selection.survivalDigits());
+        session.dimensions(200, 200);
+        session.steps(100);
+        session.density(null);
         session.mask(mask);
         session.wrap(true);
         session.palette(Palette2D.paperback2);
 
         String ruleLabel = selection.ruleLabel();
         String message = """
-                Random mode selected:
+                Random mask mode selected:
                 Rule: %s
                 Mask: %s
-                Using 200x200 grid, 100 steps, density 0.05, wrap on, palette casioBasic.
+                Using 200x200 grid, 100 steps, density center-only, wrap on, palette casioBasic.
                 """.formatted(ruleLabel, selection.maskLabel());
         telegramService.sendMessage(session.chatId(), message);
         startGeneration(session);
