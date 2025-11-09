@@ -59,7 +59,8 @@ public final class RandomSimulationFactory {
     }
 
     private static boolean[] randomMask(ThreadLocalRandom random) {
-        boolean[] mask = new boolean[9];
+        int maskSide = random.nextInt(SeedService.MIN_MASK_SIDE, SeedService.MAX_MASK_SIDE + 1);
+        boolean[] mask = new boolean[maskSide * maskSide];
         int active = 0;
         for (int idx = 0; idx < mask.length; idx++) {
             boolean on = random.nextBoolean();

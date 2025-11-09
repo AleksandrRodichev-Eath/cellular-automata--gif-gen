@@ -52,6 +52,15 @@ class SeedServiceTest {
     }
 
     @Test
+    void parseInitMaskAcceptsVariableSizes() {
+        boolean[] mask4x4 = SeedService.parseInitMask("1".repeat(16));
+        assertEquals(16, mask4x4.length);
+        boolean[] mask5x5 = SeedService.parseInitMask("0".repeat(24) + "1");
+        assertEquals(25, mask5x5.length);
+        assertEquals("1".repeat(16), SeedService.maskToLabel(mask4x4));
+    }
+
+    @Test
     void parseInitMaskRejectsInvalidLength() {
         assertThrows(IllegalArgumentException.class, () -> SeedService.parseInitMask("1010"));
     }
@@ -60,5 +69,21 @@ class SeedServiceTest {
     void maskToLabelReturnsBinaryString() {
         boolean[] mask = SeedService.parseInitMask("101010101");
         assertEquals("101010101", SeedService.maskToLabel(mask));
+    }
+
+    @Test
+    void gridWithCenteredMaskSupportsLargerMasks() {
+        boolean[] mask = SeedService.parseInitMask("1".repeat(16));
+        Grid grid = SeedService.gridWithCenteredMask(10, 10, mask);
+        assertEquals(16, grid.aliveCount());
+        int base = (10 - 4) / 2;
+        assertTrue(grid.get(base, base));
+        assertTrue(grid.get(base + 3, base + 3));
+    }
+
+    @Test
+    void gridWithCenteredMaskRejectsTooSmallGridForLargeMask() {
+        boolean[] mask = SeedService.parseInitMask("1".repeat(25));
+        assertThrows(IllegalArgumentException.class, () -> SeedService.gridWithCenteredMask(4, 6, mask));
     }
 }

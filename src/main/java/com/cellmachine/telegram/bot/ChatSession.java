@@ -159,7 +159,6 @@ public class ChatSession {
                 && width != null
                 && height != null
                 && steps != null
-                && density != null
                 && wrap != null
                 && palette != null;
     }

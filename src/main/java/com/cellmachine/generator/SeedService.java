@@ -60,11 +60,14 @@ public final class SeedService {
         return grid;
     }
 
+    public static final int MIN_MASK_SIDE = 3;
+    public static final int MAX_MASK_SIDE = 5;
+
     public static boolean[] parseInitMask(String raw) {
         if (raw == null) {
-            throw new IllegalArgumentException("Init mask must contain exactly 9 entries (3x3 matrix)");
+            throw new IllegalArgumentException("Init mask must contain 9, 16, or 25 entries (3x3 to 5x5 matrix)");
         }
-        List<Boolean> values = new ArrayList<>(9);
+        List<Boolean> values = new ArrayList<>(25);
         for (char ch : raw.toCharArray()) {
             if (Character.isWhitespace(ch)) {
                 continue;
@@ -77,10 +80,9 @@ public final class SeedService {
                 throw new IllegalArgumentException("Init mask must contain only '0' or '1' characters");
             }
         }
-        if (values.size() != 9) {
-            throw new IllegalArgumentException("Init mask must contain exactly 9 entries (3x3 matrix)");
-        }
-        boolean[] mask = new boolean[9];
+        int count = values.size();
+        resolveMaskSide(count);
+        boolean[] mask = new boolean[count];
         for (int i = 0; i < values.size(); i++) {
             mask[i] = values.get(i);
         }
@@ -89,12 +91,13 @@ public final class SeedService {
 
     public static Grid gridWithCenteredMask(int width, int height, boolean[] mask) {
         ensureMask(mask);
-        if (width < 3 || height < 3) {
-            throw new IllegalArgumentException("Grid must be at least 3x3 for init mask");
+        int maskSide = maskDimension(mask);
+        if (width < maskSide || height < maskSide) {
+            throw new IllegalArgumentException("Grid must be at least " + maskSide + "x" + maskSide + " for init mask");
         }
         Grid grid = new Grid(width, height);
-        int baseX = (width - 3) / 2;
-        int baseY = (height - 3) / 2;
+        int baseX = (width - maskSide) / 2;
+        int baseY = (height - maskSide) / 2;
         applyMask(grid, baseX, baseY, mask);
         return grid;
     }
@@ -103,8 +106,9 @@ public final class SeedService {
         ensureMask(mask);
         ensurePositiveDimensions(width, height);
         ensureDensity(density);
-        if (width < 3 || height < 3) {
-            throw new IllegalArgumentException("Grid must be at least 3x3 for init mask");
+        int maskSide = maskDimension(mask);
+        if (width < maskSide || height < maskSide) {
+            throw new IllegalArgumentException("Grid must be at least " + maskSide + "x" + maskSide + " for init mask");
         }
 
         Grid grid = new Grid(width, height);
@@ -126,8 +130,8 @@ public final class SeedService {
         int shapesNeeded = (targetAlive + activeCells - 1) / activeCells;
         int maxAttempts = shapesNeeded * 10 + 100;
         Random random = new Random(seed);
-        int maxX = width - 3;
-        int maxY = height - 3;
+        int maxX = width - maskSide;
+        int maxY = height - maskSide;
         List<int[]> offsets = maskOffsets(mask);
 
         int attempts = 0;
@@ -164,9 +168,10 @@ public final class SeedService {
     }
 
     private static void ensureMask(boolean[] mask) {
-        if (mask == null || mask.length != 9) {
-            throw new IllegalArgumentException("Init mask must contain exactly 9 entries (3x3 matrix)");
+        if (mask == null) {
+            throw new IllegalArgumentException("Init mask must not be null");
         }
+        resolveMaskSide(mask.length);
     }
 
     private static int parseCoordinate(String raw, int lineNo, char axis) {
@@ -178,23 +183,37 @@ public final class SeedService {
     }
 
     private static void applyMask(Grid grid, int baseX, int baseY, boolean[] mask) {
+        int maskSide = maskDimension(mask);
         for (int idx = 0; idx < mask.length; idx++) {
             if (!mask[idx]) {
                 continue;
             }
-            int dx = idx % 3;
-            int dy = idx / 3;
+            int dx = idx % maskSide;
+            int dy = idx / maskSide;
             grid.set(baseX + dx, baseY + dy, true);
         }
     }
 
     private static List<int[]> maskOffsets(boolean[] mask) {
         List<int[]> offsets = new ArrayList<>();
+        int maskSide = maskDimension(mask);
         for (int idx = 0; idx < mask.length; idx++) {
             if (mask[idx]) {
-                offsets.add(new int[]{idx % 3, idx / 3});
+                offsets.add(new int[]{idx % maskSide, idx / maskSide});
             }
         }
         return offsets;
+    }
+
+    private static int maskDimension(boolean[] mask) {
+        return resolveMaskSide(mask.length);
+    }
+
+    private static int resolveMaskSide(int cellCount) {
+        int side = (int) Math.round(Math.sqrt(cellCount));
+        if (side * side != cellCount || side < MIN_MASK_SIDE || side > MAX_MASK_SIDE) {
+            throw new IllegalArgumentException("Init mask must contain 9, 16, or 25 entries (3x3 to 5x5 matrix)");
+        }
+        return side;
     }
 }

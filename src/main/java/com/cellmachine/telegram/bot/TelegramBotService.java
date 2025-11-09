@@ -282,7 +282,7 @@ public class TelegramBotService {
             return;
         }
         session.steps(steps);
-        promptDensity(session);
+        promptMaskAction(session);
     }
 
     private void processManualDensity(ChatSession session, String value) {
@@ -298,7 +298,7 @@ public class TelegramBotService {
             return;
         }
         session.density(density);
-        promptMaskAction(session);
+        promptWrap(session);
     }
 
     private void processMaskInput(ChatSession session, String value) {
@@ -306,10 +306,10 @@ public class TelegramBotService {
             boolean[] mask = SeedService.parseInitMask(value);
             session.mask(mask);
         } catch (IllegalArgumentException ex) {
-            telegramService.sendMessage(session.chatId(), "Mask must include nine 0/1 characters (e.g., 111000111). Error: " + ex.getMessage());
+            telegramService.sendMessage(session.chatId(), "Mask must include 9, 16, or 25 characters (0/1 only). Error: " + ex.getMessage());
             return;
         }
-        promptWrap(session);
+        promptDensity(session);
     }
 
     private void processSizeChoice(ChatSession session, TelegramCallbackQueryDto callback, String data) {
@@ -346,7 +346,7 @@ public class TelegramBotService {
             session.steps(steps);
             removeKeyboard(callback.message());
             session.clearLastPromptMessage();
-            promptDensity(session);
+            promptMaskAction(session);
         } catch (NumberFormatException ex) {
             telegramService.sendMessage(session.chatId(), "Could not parse the number of steps.");
         }
@@ -360,6 +360,13 @@ public class TelegramBotService {
             telegramService.sendMessage(session.chatId(), "Enter a density from 0 to 1 (e.g., 0.05):");
             return;
         }
+        if ("DENSITY_CENTER".equals(data)) {
+            session.density(null);
+            removeKeyboard(callback.message());
+            session.clearLastPromptMessage();
+            promptWrap(session);
+            return;
+        }
         if (!data.startsWith("DENSITY_")) {
             telegramService.sendMessage(session.chatId(), "Unknown density choice.");
             return;
@@ -369,7 +376,7 @@ public class TelegramBotService {
             session.density(density);
             removeKeyboard(callback.message());
             session.clearLastPromptMessage();
-            promptMaskAction(session);
+            promptWrap(session);
         } catch (NumberFormatException ex) {
             telegramService.sendMessage(session.chatId(), "Could not parse the density value.");
         }
@@ -380,10 +387,10 @@ public class TelegramBotService {
         session.clearLastPromptMessage();
         if ("MASK_SKIP".equals(data)) {
             session.mask(null);
-            promptWrap(session);
+            promptDensity(session);
         } else if ("MASK_ENTER".equals(data)) {
             session.step(ConversationStep.WAITING_FOR_MASK_INPUT);
-            telegramService.sendMessage(session.chatId(), "Enter a mask (9 characters, 0/1; spaces ignored):");
+            telegramService.sendMessage(session.chatId(), "Enter a mask (3x3, 4x4, or 5x5: 9/16/25 digits of 0/1; spaces ignored):");
         } else {
             telegramService.sendMessage(session.chatId(), "Unknown mask choice.");
         }
@@ -447,11 +454,14 @@ public class TelegramBotService {
     }
 
     private void promptDensity(ChatSession session) {
-        InlineKeyboardMarkupDto keyboard = new InlineKeyboardMarkupDto(List.of(
-                List.of(button("0.01", "DENSITY_0.01"), button("0.05", "DENSITY_0.05"), button("0.1", "DENSITY_0.1")),
-                List.of(button("0.2", "DENSITY_0.2")),
-                List.of(button("Manual input", "DENSITY_MANUAL"))
-        ));
+        List<List<InlineKeyboardButtonDto>> rows = new ArrayList<>();
+        rows.add(List.of(button("0.01", "DENSITY_0.01"), button("0.05", "DENSITY_0.05"), button("0.1", "DENSITY_0.1")));
+        rows.add(List.of(button("0.2", "DENSITY_0.2")));
+        rows.add(List.of(button("Manual input", "DENSITY_MANUAL")));
+        if (session.mask() != null) {
+            rows.add(List.of(button("Center structure only", "DENSITY_CENTER")));
+        }
+        InlineKeyboardMarkupDto keyboard = new InlineKeyboardMarkupDto(rows);
         TelegramMessageDto message = telegramService.sendMessage(session.chatId(), "Select the initial density:", keyboard);
         session.lastPromptMessageId(message.messageId());
         session.step(ConversationStep.CHOOSING_DENSITY);
