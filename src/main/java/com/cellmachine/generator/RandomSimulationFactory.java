@@ -13,16 +13,16 @@ public final class RandomSimulationFactory {
     private RandomSimulationFactory() {
     }
 
-    public static RandomSelection create() {
-        return create(ThreadLocalRandom.current());
+    public static RandomSelection create(boolean withMask) {
+        return create(ThreadLocalRandom.current(), withMask);
     }
 
-    static RandomSelection create(ThreadLocalRandom random) {
+    static RandomSelection create(ThreadLocalRandom random, boolean withMask) {
         Objects.requireNonNull(random, "random");
         String birthDigits = randomRuleDigits(random);
         String survivalDigits = randomRuleDigits(random);
         boolean[] mask = randomMask(random);
-        return new RandomSelection(birthDigits, survivalDigits, mask);
+        return new RandomSelection(birthDigits, survivalDigits, withMask ? mask : null);
     }
 
     public static SimulationOptions buildOptions(RandomSelection selection) {
@@ -36,7 +36,7 @@ public final class RandomSimulationFactory {
                 .steps(RANDOM_STEPS)
                 .delayCs(SimulationOptions.DEFAULT_DELAY_CS)
                 .wrap(true)
-                .density(RANDOM_DENSITY)
+                .density(selection.mask == null ? RANDOM_DENSITY : null)
                 .outputFormat(SimulationOutputFormat.MP4)
                 .palette(Palette2D.paperback2)
                 .randomSeed(SeedService.DEFAULT_RANDOM_SEED);

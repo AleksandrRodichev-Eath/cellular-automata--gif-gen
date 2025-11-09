@@ -238,7 +238,7 @@ public class TelegramBotService {
         session.simpleRuleMode(false);
         session.clearPresetOptions();
 
-        RandomSelection selection = RandomSimulationFactory.create();
+        RandomSelection selection = RandomSimulationFactory.create(false);
 
         session.birthDigits(selection.birthDigits());
         session.survivalDigits(selection.survivalDigits());
@@ -255,7 +255,7 @@ public class TelegramBotService {
         session.simpleRuleMode(false);
         session.clearPresetOptions();
 
-        RandomSelection selection = RandomSimulationFactory.create();
+        RandomSelection selection = RandomSimulationFactory.create(true);
         boolean[] mask = selection.mask();
 
         session.birthDigits(selection.birthDigits());
@@ -267,14 +267,6 @@ public class TelegramBotService {
         session.wrap(true);
         session.palette(Palette2D.paperback2);
 
-        String ruleLabel = selection.ruleLabel();
-        String message = """
-                Random mask mode selected:
-                Rule: %s
-                Mask: %s
-                Using 200x200 grid, 100 steps, density center-only, wrap on, palette casioBasic.
-                """.formatted(ruleLabel, selection.maskLabel());
-        telegramService.sendMessage(session.chatId(), message);
         startGeneration(session);
     }
 

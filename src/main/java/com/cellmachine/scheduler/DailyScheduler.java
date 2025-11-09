@@ -9,6 +9,8 @@ import com.cellmachine.telegram.TelegramService;
 import java.nio.file.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -32,29 +34,47 @@ public class DailyScheduler {
     }
 
     private void dispatchBatch(String label) {
-        for (int index = 1; index <= RANDOM_BATCH_SIZE; index++) {
-            dispatchRandomAnimation(label, index);
-        }
+        dispatchRandomAnimation(label);
+        dispatchRandomAnimation(label);
+        dispatchRandomMaskAnimation(label);
+        dispatchRandomMaskAnimation(label);
     }
 
-    private void dispatchRandomAnimation(String label, int index) {
-        RandomSelection selection = RandomSimulationFactory.create();
+    private void dispatchRandomMaskAnimation(String label) {
+        RandomSelection selection = RandomSimulationFactory.create(true);
         SimulationOptions options = RandomSimulationFactory.buildOptions(selection);
         try {
             SimulationResult result = simulationService.runSimulation(options);
             Path savedPath = simulationService.persistLastMedia(result.bytes(), result.format());
             telegramService.sendAnimation(result.fileName(), result.bytes(), result.summary());
             log.info(
-                    "Dispatched {} animation {}/{}: {} (rule={}, mask={}) saved at {}",
+                "Dispatched {} animation: {} (rule={}, mask={}) saved at {}",
+                label,
+                result.format(),
+                selection.ruleLabel(),
+                selection.maskLabel(),
+                savedPath);
+        } catch (Exception ex) {
+            log.error("Failed to dispatch {} animation", label, ex);
+        }
+    }
+
+    private void dispatchRandomAnimation(String label) {
+        RandomSelection selection = RandomSimulationFactory.create(false);
+        SimulationOptions options = RandomSimulationFactory.buildOptions(selection);
+        try {
+            SimulationResult result = simulationService.runSimulation(options);
+            Path savedPath = simulationService.persistLastMedia(result.bytes(), result.format());
+            telegramService.sendAnimation(result.fileName(), result.bytes(), result.summary());
+            log.info(
+                    "Dispatched {} animation: {} (rule={}, mask={}) saved at {}",
                     label,
-                    index,
-                    RANDOM_BATCH_SIZE,
                     result.format(),
                     selection.ruleLabel(),
                     selection.maskLabel(),
                     savedPath);
         } catch (Exception ex) {
-            log.error("Failed to dispatch {} animation {}/{}", label, index, RANDOM_BATCH_SIZE, ex);
+            log.error("Failed to dispatch {} animation", label, ex);
         }
     }
 }
