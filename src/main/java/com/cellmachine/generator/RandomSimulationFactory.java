@@ -38,7 +38,7 @@ public final class RandomSimulationFactory {
                 .wrap(true)
                 .density(RANDOM_DENSITY)
                 .outputFormat(SimulationOutputFormat.MP4)
-                .palette(Palette2D.casioBasic)
+                .palette(Palette2D.paperback2)
                 .randomSeed(SeedService.DEFAULT_RANDOM_SEED);
         boolean[] mask = selection.mask();
         if (mask != null) {

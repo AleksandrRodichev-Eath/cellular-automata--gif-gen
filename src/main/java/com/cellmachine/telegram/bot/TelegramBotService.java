@@ -219,7 +219,7 @@ public class TelegramBotService {
         session.density(0.05d);
         session.mask(null);
         session.wrap(true);
-        session.palette(Palette2D.casioBasic);
+        session.palette(Palette2D.paperback2);
         telegramService.sendMessage(
                 session.chatId(),
                 "Using 200x200 grid, 200 steps, density 0.05, wrap on, palette casioBasic.");
@@ -240,7 +240,7 @@ public class TelegramBotService {
         session.density(0.05d);
         session.mask(mask);
         session.wrap(true);
-        session.palette(Palette2D.casioBasic);
+        session.palette(Palette2D.paperback2);
 
         String ruleLabel = selection.ruleLabel();
         String message = """
